@@ -5,20 +5,19 @@
 // ─────────────────────────────────────────────────────
 // AUTH
 // ─────────────────────────────────────────────────────
-const AUTH = { currentUser: null };
+const AUTH = { currentUser: null, users: [] };
 
 function loadAuth() {
+  // load users into memory ONCE — never re-read inside signin/signup
+  try {
+    AUTH.users = JSON.parse(localStorage.getItem('hf_users') || '[]');
+  } catch(e) { AUTH.users = []; }
   const session = localStorage.getItem('hf_session');
-  const users   = JSON.parse(localStorage.getItem('hf_users') || '[]');
-  if (session) AUTH.currentUser = users.find(u => u.id === session) || null;
+  if (session) AUTH.currentUser = AUTH.users.find(u => u.id === session) || null;
 }
 
-function saveUsers(users) {
-  localStorage.setItem('hf_users', JSON.stringify(users));
-}
-
-function getUsers() {
-  return JSON.parse(localStorage.getItem('hf_users') || '[]');
+function persistUsers() {
+  localStorage.setItem('hf_users', JSON.stringify(AUTH.users));
 }
 
 function userPrefix() {
@@ -26,25 +25,25 @@ function userPrefix() {
 }
 
 function authSignup(name, email, password) {
-  const users = getUsers();
-  if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
+  const key = email.toLowerCase().trim();
+  if (AUTH.users.find(u => u.email.toLowerCase() === key)) {
     return { ok: false, msg: 'An account with this email already exists.' };
   }
   if (password.length < 6) {
     return { ok: false, msg: 'Password must be at least 6 characters.' };
   }
-  const user = { id: uid(), name, email, password, createdAt: Date.now() };
-  users.push(user);
-  saveUsers(users);
+  const user = { id: uid(), name, email: key, password, createdAt: Date.now() };
+  AUTH.users.push(user);
+  persistUsers();
   localStorage.setItem('hf_session', user.id);
   AUTH.currentUser = user;
   return { ok: true };
 }
 
 function authSignin(email, password) {
-  const users = getUsers();
-  const user  = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-  if (!user)            return { ok: false, msg: 'No account found with this email.' };
+  const key  = email.toLowerCase().trim();
+  const user = AUTH.users.find(u => u.email.toLowerCase() === key);
+  if (!user)                    return { ok: false, msg: 'No account found with this email.' };
   if (user.password !== password) return { ok: false, msg: 'Incorrect password.' };
   localStorage.setItem('hf_session', user.id);
   AUTH.currentUser = user;
